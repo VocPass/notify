@@ -143,6 +143,8 @@ async def send_push(
     notify_title: str,
     notify_body: str,
     today_slots: list,
+    db_client,
+    db_id,
 ):
     state = {**content_state, "todaySlots": today_slots}
 
@@ -202,4 +204,5 @@ async def send_push(
     if resp.status_code == 200:
         print(f"\n✅ {action_label}推送成功！")
     else:
+        db_client.collection("notify").update(db_id, {"valid": False})
         print(f"\n❌ 推送失敗，請檢查 Token 和設定")

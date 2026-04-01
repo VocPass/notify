@@ -134,6 +134,8 @@ for i in all_data:
         notify_title="hello",
         notify_body="sb",
         today_slots=todaySlots,
+        db_client=client,
+        db_id=i.id,
     ))
 
     client.collection("notify").update(i.id, {"last_send": now.isoformat(), "last_action": label})
