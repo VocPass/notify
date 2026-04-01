@@ -64,8 +64,8 @@ def get_action(curriculum):
     for name in curriculum:
         for schedule in curriculum[name]["schedule"]:
             if schedule["weekday"] == weekday:
-                sh, sm = map(int, schedule["start"].split(":"))
-                eh, em = map(int, schedule["end"].split(":"))
+                sh, sm = map(int, schedule.get('start','00:00').split(":"))
+                eh, em = map(int, schedule.get('end','00:00').split(":"))
                 start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 end_dt   = now.replace(hour=eh, minute=em, second=0, microsecond=0)
                 period   = schedule.get("period", "?")
