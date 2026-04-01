@@ -86,6 +86,10 @@ def get_action(curriculum):
     if now > last_end + timedelta(minutes=10):
         return ("end", "放學")
 
+    # 最後一節課剛結束（0–10 分鐘內）→ 先 update 一次
+    if now > last_end:
+        return ("update", "放學前更新")
+
     # 下課時間（兩節課之間）
     for idx in range(len(slots) - 1):
         class_end  = slots[idx][1]
