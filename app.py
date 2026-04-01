@@ -106,10 +106,21 @@ for i in all_data:
     curriculum = i.curriculum
     if not curriculum:
         continue
-    
+
     action = get_action(curriculum)
     if action is None:
         continue
+
+    if i.last_send:
+        last_send_dt = datetime.fromisoformat(i.last_send.replace("Z", "+00:00")).astimezone(tz_taiwan)
+        last_action = getattr(i, "last_action", None)
+
+        if action in ("notify_start", "end"):
+            if last_action == action and last_send_dt.date() == now.date():
+                continue
+        else:
+            if now - last_send_dt < timedelta(minutes=5):
+                continue
 
     todaySlots = to_todaySlots(curriculum)
     asyncio.run(send_push(
@@ -121,3 +132,5 @@ for i in all_data:
         notify_body="sb",
         today_slots=todaySlots,
     ))
+
+    client.collection("notify").update(i.id, {"last_send": now.isoformat(), "last_action": action})
