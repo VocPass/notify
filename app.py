@@ -54,10 +54,11 @@ def to_todaySlots(data):
 
 def get_action(curriculum):
     """
-    根據目前時間決定要送出的 action，或 None（不推通知）。
-    - notify_start：距第一節上課 <= 20 分鐘
-    - update：目前在下課時間（兩節課之間）
-    - end：放學後超過 10 分鐘
+    回傳 (action, label) 或 None。
+    - ("notify_start", "課前通知")
+    - ("update", "第X節")     ← 上課中
+    - ("update", "第X節下課") ← 兩節課之間
+    - ("end",    "放學")
     """
     slots = []
     for name in curriculum:
@@ -67,7 +68,8 @@ def get_action(curriculum):
                 eh, em = map(int, schedule["end"].split(":"))
                 start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 end_dt   = now.replace(hour=eh, minute=em, second=0, microsecond=0)
-                slots.append((start_dt, end_dt))
+                period   = schedule.get("period", "?")
+                slots.append((start_dt, end_dt, period))
 
     if not slots:
         return None
@@ -78,20 +80,24 @@ def get_action(curriculum):
 
     # 距第一節上課 <= 20 分鐘（且尚未上課）
     if first_start - timedelta(minutes=20) <= now < first_start:
-        return "notify_start"
+        return ("notify_start", "課前通知")
 
     # 放學後超過 10 分鐘
     if now > last_end + timedelta(minutes=10):
-        return "end"
+        return ("end", "放學")
 
-    # 檢查是否在下課時間（兩節課之間）
-    for i in range(len(slots) - 1):
-        class_end  = slots[i][1]
-        next_start = slots[i + 1][0]
+    # 下課時間（兩節課之間）
+    for idx in range(len(slots) - 1):
+        class_end  = slots[idx][1]
+        next_start = slots[idx + 1][0]
         if class_end <= now <= next_start:
-            return "update"
+            return ("update", f"第{slots[idx][2]}節下課")
 
-    # 上課中或其他時段 → 不推通知
+    # 上課中
+    for start_dt, end_dt, period in slots:
+        if start_dt <= now <= end_dt:
+            return ("update", f"第{period}節")
+
     return None
 
 
@@ -107,20 +113,17 @@ for i in all_data:
     if not curriculum:
         continue
 
-    action = get_action(curriculum)
-    if action is None:
+    result = get_action(curriculum)
+    if result is None:
         continue
+    action, label = result
 
+    # 同 label 今天已送過 → 跳過（每個狀態一天只送一次）
     if i.last_send:
         last_send_dt = datetime.fromisoformat(i.last_send.replace("Z", "+00:00")).astimezone(tz_taiwan)
         last_action = getattr(i, "last_action", None)
-
-        if action in ("notify_start", "end"):
-            if last_action == action and last_send_dt.date() == now.date():
-                continue
-        else:
-            if now - last_send_dt < timedelta(minutes=5):
-                continue
+        if last_action == label and last_send_dt.date() == now.date():
+            continue
 
     todaySlots = to_todaySlots(curriculum)
     asyncio.run(send_push(
@@ -133,4 +136,4 @@ for i in all_data:
         today_slots=todaySlots,
     ))
 
-    client.collection("notify").update(i.id, {"last_send": now.isoformat(), "last_action": action})
+    client.collection("notify").update(i.id, {"last_send": now.isoformat(), "last_action": label})
