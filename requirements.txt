@@ -1,0 +1,6 @@
+pocketbase
+PyJWT
+cryptography
+httpx[http2]
+dotenv
+requests
