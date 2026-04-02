@@ -134,7 +134,7 @@ for i in all_data:
         action=action,
         push_to_start_token=i.start_token,
         push_token=i.update_token,
-        apns_device_token=i.device_token,
+        apns_device_token=i.apns_token,
         notify_title="打開App看看今天的課表吧！",
         notify_body="愛因斯坦沒有說過：人生最大的遺憾就是沒有在課前收到課表通知。當然這功能我還在測試...",
         today_slots=todaySlots,

@@ -12,6 +12,7 @@ APPLE_REFERENCE_DATE_OFFSET = 978307200
 TW = timezone(timedelta(hours=8))
 load_dotenv()
 
+
 def swift_date(year, month, day, hour, minute=0) -> float:
     """輸入台灣時間，自動轉換為 Swift Codable Date"""
     dt = datetime(year, month, day, hour, minute, tzinfo=TW)
@@ -20,7 +21,7 @@ def swift_date(year, month, day, hour, minute=0) -> float:
 
 CONFIG = {
     "team_id": os.environ.get("team_id"),
-    "key_id":os.environ.get("key_id"),
+    "key_id": os.environ.get("key_id"),
     "key_path": os.environ.get("key_path"),
     "bundle_id": os.environ.get("bundle_id"),
     "use_sandbox": False,
@@ -137,14 +138,14 @@ def build_payload(
 
 async def send_push(
     action: str,
-    push_to_start_token: str,
-    push_token: str,
-    apns_device_token: str,
-    notify_title: str,
-    notify_body: str,
-    today_slots: list,
-    db_client,
-    db_id,
+    push_to_start_token: str = "",
+    push_token: str = "",
+    apns_device_token: str = "",
+    notify_title: str = "",
+    notify_body: str = "",
+    today_slots: list = [],
+    db_client=None,
+    db_id=None,
 ):
     state = {**content_state, "todaySlots": today_slots}
 
