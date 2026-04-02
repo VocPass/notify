@@ -111,7 +111,7 @@ r = requests.get(os.environ.get("status"))
 all_data = client.collection("notify").get_full_list()
 
 for i in all_data:
-    if not i.is_open:
+    if not i.is_open and not i.valid:
         continue
     curriculum = i.curriculum
     if not curriculum:
@@ -136,7 +136,7 @@ for i in all_data:
         push_token=i.update_token,
         apns_device_token=i.device_token,
         notify_title="打開App看看今天的課表吧！",
-        notify_body="愛因斯坦沒有說過：人生最大的遺憾就是沒有在課前收到課表通知。",
+        notify_body="愛因斯坦沒有說過：人生最大的遺憾就是沒有在課前收到課表通知。當然這功能我還在測試...",
         today_slots=todaySlots,
         db_client=client,
         db_id=i.id,
