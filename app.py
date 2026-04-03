@@ -111,7 +111,7 @@ r = requests.get(os.environ.get("status"))
 all_data = client.collection("notify").get_full_list()
 
 for i in all_data:
-    if not i.is_open and not i.valid:
+    if not i.is_open:
         continue
     curriculum = i.curriculum
     if not curriculum:

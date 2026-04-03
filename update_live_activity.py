@@ -205,5 +205,5 @@ async def send_push(
     if resp.status_code == 200:
         print(f"\n✅ {action_label}推送成功！")
     else:
-        db_client.collection("notify").update(db_id, {"valid": False})
+        db_client.collection("notify").update(db_id, {"error":f"{resp.status_code}: {resp.text}"})
         print(f"\n❌ 推送失敗，請檢查 Token 和設定")
