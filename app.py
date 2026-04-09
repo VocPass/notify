@@ -22,6 +22,11 @@ year = now.year
 month = now.month
 day = now.day
 
+def get_time_str(schedule, key, fallback):
+    val = schedule.get(key, "")
+    return val if val and ":" in val else fallback
+
+
 time_template = {
     "一": ("08:10", "09:00"),
     "二": ("09:10", "10:00"),
@@ -54,31 +59,13 @@ def to_todaySlots(data):
                             year,
                             month,
                             day,
-                            int(
-                                schedule.get(
-                                    "start", time_template.get(schedule["period"], ("00:00", "00:00"))[0]
-                                ).split(":")[0]
-                            ),
-                            int(
-                                schedule.get(
-                                    "start", time_template.get(schedule["period"], ("00:00", "00:00"))[0]
-                                ).split(":")[1]
-                            ),
+                            *map(int, get_time_str(schedule, "start", time_template.get(schedule["period"], ("00:00", "00:00"))[0]).split(":")),
                         ),
                         "endTime": swift_date(
                             year,
                             month,
                             day,
-                            int(
-                                schedule.get(
-                                    "end", time_template.get(schedule["period"], ("00:00", "00:00"))[1]
-                                ).split(":")[0]
-                            ),
-                            int(
-                                schedule.get(
-                                    "end", time_template.get(schedule["period"], ("00:00", "00:00"))[1]
-                                ).split(":")[1]
-                            ),
+                            *map(int, get_time_str(schedule, "end", time_template.get(schedule["period"], ("00:00", "00:00"))[1]).split(":")),
                         ),
                         "room": schedule.get("room", ""),
                         "teacher": schedule.get("teacher", ""),
@@ -100,14 +87,9 @@ def get_action(curriculum):
         for schedule in curriculum[name]["schedule"]:
             if schedule["weekday"] == weekday:
 
-                sh, sm = map(
-                    int,
-                    schedule.get("start", time_template.get(schedule["period"], ("00:00", "00:00"))[0]).split(":"),
-                )
-                eh, em = map(
-                    int,
-                    schedule.get("end", time_template.get(schedule["period"], ("00:00", "00:00"))[1]).split(":"),
-                )
+                tpl = time_template.get(schedule["period"], ("00:00", "00:00"))
+                sh, sm = map(int, get_time_str(schedule, "start", tpl[0]).split(":"))
+                eh, em = map(int, get_time_str(schedule, "end",   tpl[1]).split(":"))
                 start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 end_dt = now.replace(hour=eh, minute=em, second=0, microsecond=0)
                 period = schedule.get("period", "?")
