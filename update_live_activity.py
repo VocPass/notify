@@ -144,6 +144,7 @@ async def send_push(
     notify_title: str = "",
     notify_body: str = "",
     today_slots: list = [],
+    jwt_token: str="",
     db_client=None,
     db_id=None,
 ):
@@ -166,7 +167,7 @@ async def send_push(
 
     url = f"https://{host}/3/device/{device_token}"
 
-    token = make_jwt_token()
+    token = jwt_token
     if is_notify:
         headers = {
             "authorization": f"bearer {token}",

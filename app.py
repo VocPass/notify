@@ -1,4 +1,4 @@
-from update_live_activity import swift_date, send_push
+from update_live_activity import *
 from datetime import datetime, timezone, timedelta
 from pocketbase import PocketBase
 from dotenv import load_dotenv
@@ -164,6 +164,7 @@ for i in all_data:
             notify_title="打開App來啟動動態島吧！",
             notify_body="我也不知道為什麼Apple不讓我自動啟動...然後只能存在8小時",
             today_slots=todaySlots,
+            jwt_token=make_jwt_token(),
             db_client=client,
             db_id=i.id,
         )
