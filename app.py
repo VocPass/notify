@@ -165,8 +165,11 @@ for i in all_data:
     curriculum = i.curriculum
     if not curriculum:
         continue
-
-    result = get_action(curriculum)
+    try:
+        result = get_action(curriculum)
+    except Exception as e:
+        print(f"Error processing curriculum for id {i.id}: {e}")
+        continue
     if result is None:
         continue
     action, label = result
@@ -179,8 +182,11 @@ for i in all_data:
         last_action = getattr(i, "last_action", None)
         if last_action == label and last_send_dt.date() == now.date():
             continue
-
-    todaySlots = to_todaySlots(curriculum)
+    try:
+        todaySlots = to_todaySlots(curriculum)
+    except Exception as e:
+        print(f"Error processing todaySlots for id {i.id}: {e}")
+        todaySlots = []
     asyncio.run(
         send_push(
             action=action,
