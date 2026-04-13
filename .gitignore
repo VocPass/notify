@@ -1,3 +1,4 @@
 *.p8
 .env
 __*
+logs.txt
