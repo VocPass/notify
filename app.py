@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 import requests
 import asyncio
+import time
 import os
 
 load_dotenv()
@@ -14,6 +15,7 @@ admin_data = client.admins.auth_with_password(
     os.environ.get("DB_EMAIL"), os.environ.get("DB_PASSWD")
 )
 
+jwt_token = make_jwt_token()
 tz_taiwan = timezone(timedelta(hours=8))
 now = datetime.now(tz_taiwan)
 weekday_chinese = ["一", "二", "三", "四", "五", "六", "日"]
@@ -21,6 +23,12 @@ weekday = weekday_chinese[now.weekday()]
 year = now.year
 month = now.month
 day = now.day
+
+logs = ""
+if os.path.isfile("logs.txt"):
+    with open("logs.txt", "r") as f:
+        logs = f.read()
+
 
 def get_time_str(schedule, key, fallback):
     val = schedule.get(key, "")
@@ -59,13 +67,31 @@ def to_todaySlots(data):
                             year,
                             month,
                             day,
-                            *map(int, get_time_str(schedule, "start", time_template.get(schedule["period"], ("00:00", "00:00"))[0]).split(":")),
+                            *map(
+                                int,
+                                get_time_str(
+                                    schedule,
+                                    "start",
+                                    time_template.get(
+                                        schedule["period"], ("00:00", "00:00")
+                                    )[0],
+                                ).split(":"),
+                            ),
                         ),
                         "endTime": swift_date(
                             year,
                             month,
                             day,
-                            *map(int, get_time_str(schedule, "end", time_template.get(schedule["period"], ("00:00", "00:00"))[1]).split(":")),
+                            *map(
+                                int,
+                                get_time_str(
+                                    schedule,
+                                    "end",
+                                    time_template.get(
+                                        schedule["period"], ("00:00", "00:00")
+                                    )[1],
+                                ).split(":"),
+                            ),
                         ),
                         "room": schedule.get("room", ""),
                         "teacher": schedule.get("teacher", ""),
@@ -89,7 +115,7 @@ def get_action(curriculum):
 
                 tpl = time_template.get(schedule["period"], ("00:00", "00:00"))
                 sh, sm = map(int, get_time_str(schedule, "start", tpl[0]).split(":"))
-                eh, em = map(int, get_time_str(schedule, "end",   tpl[1]).split(":"))
+                eh, em = map(int, get_time_str(schedule, "end", tpl[1]).split(":"))
                 start_dt = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 end_dt = now.replace(hour=eh, minute=em, second=0, microsecond=0)
                 period = schedule.get("period", "?")
@@ -129,10 +155,10 @@ def get_action(curriculum):
     return None
 
 
-
-
 all_data = client.collection("notify").get_full_list()
 
+t1 = time.time()
+sended = 0
 for i in all_data:
     if not i.is_open:
         continue
@@ -164,16 +190,22 @@ for i in all_data:
             notify_title="打開App來啟動動態島吧！",
             notify_body="我也不知道為什麼Apple不讓我自動啟動...然後只能存在8小時",
             today_slots=todaySlots,
-            jwt_token=make_jwt_token(),
+            jwt_token=jwt_token,
             db_client=client,
             db_id=i.id,
         )
     )
+    sended += 1
 
     client.collection("notify").update(
         i.id, {"last_send": now.isoformat(), "last_action": label}
     )
 
+t2 = time.time()
 
+
+logs += f"{now.isoformat()}: {t2-t1:.2f}s -> {sended}\n"
+with open("logs.txt", "w+") as f:
+    f.write(logs)
 # Ping
 r = requests.get(os.environ.get("status"))
