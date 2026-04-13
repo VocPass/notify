@@ -203,9 +203,9 @@ for i in all_data:
 
 t2 = time.time()
 
-
-logs += f"{now.isoformat()}: {t2-t1:.2f}s -> {sended}\n"
-with open("logs.txt", "w+") as f:
-    f.write(logs)
+if sended > 0:
+    logs += f"{now.isoformat()}: {t2-t1:.2f}s -> {sended}\n"
+    with open("logs.txt", "w+") as f:
+        f.write(logs)
 # Ping
 r = requests.get(os.environ.get("status"))
