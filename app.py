@@ -4,6 +4,7 @@ from pocketbase import PocketBase
 from dotenv import load_dotenv
 
 import requests
+import random
 import asyncio
 import time
 import os
@@ -181,12 +182,27 @@ for i in all_data:
         ).astimezone(tz_taiwan)
         last_action = getattr(i, "last_action", None)
         if last_action == label and last_send_dt.date() == now.date():
-            continue
+            pass
+            # continue
     try:
         todaySlots = to_todaySlots(curriculum)
     except Exception as e:
         print(f"Error processing todaySlots for id {i.id}: {e}")
         todaySlots = []
+    sorted_slots = sorted(todaySlots, key=lambda s: s["startTime"])
+    top3 = sorted_slots[: max(0, min(3, len(sorted_slots) - 1))]
+    top3_str = "、".join(s["subject"] for s in top3)
+    notifys = [
+        "今天的課有 " + top3_str + "... 曠課被記不關我的事",
+        "你今天有 " + top3_str + "...要上，祝你撐過去",
+        "今日課程：" + top3_str + "...。幫你默哀三秒",
+        "不好意思打擾，但今天就是有 " + top3_str + "...",
+        "今天的 "+ top3_str + "...我給ㄅ級分",
+        "準備好迎接 " + top3_str + "...了嗎？",
+        "把今天的 "+ top3_str + "...都上完，就離畢業又近了一天！",
+    ]
+    notify_body = random.choice(notifys)
+    
     asyncio.run(
         send_push(
             action=action,
@@ -194,7 +210,7 @@ for i in all_data:
             push_token=i.update_token,
             apns_device_token=i.apns_token,
             notify_title="打開App來啟動動態島吧！",
-            notify_body="我也不知道為什麼Apple不讓我自動啟動...然後只能存在8小時",
+            notify_body=notify_body,
             today_slots=todaySlots,
             jwt_token=jwt_token,
             db_client=client,
