@@ -182,8 +182,7 @@ for i in all_data:
         ).astimezone(tz_taiwan)
         last_action = getattr(i, "last_action", None)
         if last_action == label and last_send_dt.date() == now.date():
-            pass
-            # continue
+            continue
     try:
         todaySlots = to_todaySlots(curriculum)
     except Exception as e:
