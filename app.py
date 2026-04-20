@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from pocketbase import PocketBase
 from dotenv import load_dotenv
 
+import httpx
 import requests
 import random
 import asyncio
@@ -159,7 +160,11 @@ def get_action(curriculum):
 all_data = client.collection("notify").get_full_list()
 
 t1 = time.time()
-sended = 0
+
+# Pre-process all users synchronously, collect push tasks
+push_tasks = []
+pending_updates = []  # (db_id, label)
+
 for i in all_data:
     if not i.is_open:
         continue
@@ -201,26 +206,37 @@ for i in all_data:
         "把今天的 "+ top3_str + "...都上完，就離畢業又近了一天！",
     ]
     notify_body = random.choice(notifys)
-    
-    asyncio.run(
-        send_push(
-            action=action,
-            push_to_start_token=i.start_token,
-            push_token=i.update_token,
-            apns_device_token=i.apns_token,
-            notify_title="打開App來啟動動態島吧！",
-            notify_body=notify_body,
-            today_slots=todaySlots,
-            jwt_token=jwt_token,
-            db_client=client,
-            db_id=i.id,
-        )
-    )
-    sended += 1
+    push_tasks.append({
+        "action": action,
+        "push_to_start_token": i.start_token,
+        "push_token": i.update_token,
+        "apns_device_token": i.apns_token,
+        "notify_title": "打開App來啟動動態島吧！",
+        "notify_body": notify_body,
+        "today_slots": todaySlots,
+        "jwt_token": jwt_token,
+        "db_client": client,
+        "db_id": i.id,
+    })
+    pending_updates.append((i.id, label))
 
-    client.collection("notify").update(
-        i.id, {"last_send": now.isoformat(), "last_action": label}
-    )
+
+async def run_all(tasks):
+    async with httpx.AsyncClient(http2=True) as http_client:
+        return await asyncio.gather(
+            *[send_push(**task, http_client=http_client) for task in tasks],
+            return_exceptions=True,
+        )
+
+
+sended = 0
+if push_tasks:
+    results = asyncio.run(run_all(push_tasks))
+    for (db_id, label), ok in zip(pending_updates, results):
+        sended += 1
+        client.collection("notify").update(
+            db_id, {"last_send": now.isoformat(), "last_action": label}
+        )
 
 t2 = time.time()
 
