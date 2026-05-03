@@ -1,4 +1,4 @@
-pocketbase
+pocketbase==0.15.0
 PyJWT
 cryptography
 httpx[http2]
