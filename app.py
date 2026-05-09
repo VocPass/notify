@@ -130,8 +130,8 @@ def get_action(curriculum):
     first_start = slots[0][0]
     last_end = slots[-1][1]
 
-    # 距第一節上課 <= 20 分鐘（且尚未上課）
-    if first_start - timedelta(minutes=20) <= now < first_start:
+    # 距第一節上課 <= 60 分鐘（且尚未上課）
+    if first_start - timedelta(minutes=60) <= now < first_start:
         return ("notify_start", "課前通知")
 
     # 放學後超過 10 分鐘
@@ -204,6 +204,13 @@ for i in all_data:
         "今天的 "+ top3_str + "...我給ㄅ級分",
         "準備好迎接 " + top3_str + "...了嗎？",
         "把今天的 "+ top3_str + "...都上完，就離畢業又近了一天！",
+        "別忘了今天的 " + top3_str + "... 乖乖去上課吧",
+        "早安，今天的 " + top3_str + "... 在等你囉",
+        top3_str + "... 說他想你了，去看看他吧",
+        "今日有：" + top3_str + "...，你準備好了嗎？",
+        "你與 " + top3_str + "... 的距離，只差一個鬧鐘",
+        "別掙扎了，" + top3_str + "... 在呼喚你",
+        "人生苦短，但 " + top3_str + "... 還是得上",
     ]
     notify_body = random.choice(notifys)
     push_tasks.append({
