@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from pocketbase import PocketBase
 from dotenv import load_dotenv
 
+import httpx
 import requests
 import random
 import asyncio
@@ -149,8 +150,8 @@ def get_action(curriculum):
     first_start = slots[0][0]
     last_end = slots[-1][1]
 
-    # 距第一節上課 <= 20 分鐘（且尚未上課）
-    if first_start - timedelta(minutes=20) <= now < first_start:
+    # 距第一節上課 <= 60 分鐘（且尚未上課）
+    if first_start - timedelta(minutes=60) <= now < first_start:
         return ("notify_start", "課前通知")
 
     # 放學後超過 10 分鐘
@@ -179,7 +180,11 @@ def get_action(curriculum):
 all_data = client.collection("notify").get_full_list()
 
 t1 = time.time()
-sended = 0
+
+# Pre-process all users synchronously, collect push tasks
+push_tasks = []
+pending_updates = []  # (db_id, label)
+
 for i in all_data:
     if not i.is_open:
         continue
@@ -202,8 +207,7 @@ for i in all_data:
         ).astimezone(tz_taiwan)
         last_action = getattr(i, "last_action", None)
         if last_action == label and last_send_dt.date() == now.date():
-            pass
-            # continue
+            continue
     try:
         todaySlots = to_todaySlots(curriculum)
     except Exception as e:
@@ -220,28 +224,46 @@ for i in all_data:
         "今天的 "+ top3_str + "...我給ㄅ級分",
         "準備好迎接 " + top3_str + "...了嗎？",
         "把今天的 "+ top3_str + "...都上完，就離畢業又近了一天！",
+        "別忘了今天的 " + top3_str + "... 乖乖去上課吧",
+        "早安，今天的 " + top3_str + "... 在等你囉",
+        top3_str + "... 說他想你了，去看看他吧",
+        "今日有：" + top3_str + "...，你準備好了嗎？",
+        "你與 " + top3_str + "... 的距離，只差一個鬧鐘",
+        "別掙扎了，" + top3_str + "... 在呼喚你",
+        "人生苦短，但 " + top3_str + "... 還是得上",
     ]
     notify_body = random.choice(notifys)
-    
-    asyncio.run(
-        send_push(
-            action=action,
-            push_to_start_token=i.start_token,
-            push_token=i.update_token,
-            apns_device_token=i.apns_token,
-            notify_title="打開App來啟動動態島吧！",
-            notify_body=notify_body,
-            today_slots=todaySlots,
-            jwt_token=jwt_token,
-            db_client=client,
-            db_id=i.id,
-        )
-    )
-    sended += 1
+    push_tasks.append({
+        "action": action,
+        "push_to_start_token": i.start_token,
+        "push_token": i.update_token,
+        "apns_device_token": i.apns_token,
+        "notify_title": "打開App來啟動動態島吧！",
+        "notify_body": notify_body,
+        "today_slots": todaySlots,
+        "jwt_token": jwt_token,
+        "db_client": client,
+        "db_id": i.id,
+    })
+    pending_updates.append((i.id, label))
 
-    client.collection("notify").update(
-        i.id, {"last_send": now.isoformat(), "last_action": label}
-    )
+
+async def run_all(tasks):
+    async with httpx.AsyncClient(http2=True) as http_client:
+        return await asyncio.gather(
+            *[send_push(**task, http_client=http_client) for task in tasks],
+            return_exceptions=True,
+        )
+
+
+sended = 0
+if push_tasks:
+    results = asyncio.run(run_all(push_tasks))
+    for (db_id, label), ok in zip(pending_updates, results):
+        sended += 1
+        client.collection("notify").update(
+            db_id, {"last_send": now.isoformat(), "last_action": label}
+        )
 
 # ---------- Android ----------
 android_data = client.collection("notify_android").get_full_list()

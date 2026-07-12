@@ -147,6 +147,7 @@ async def send_push(
     jwt_token: str="",
     db_client=None,
     db_id=None,
+    http_client: httpx.AsyncClient = None,
 ):
     state = {**content_state, "todaySlots": today_slots}
 
@@ -196,8 +197,11 @@ async def send_push(
     print(f"→ 操作: {action_label} Live Activity")
     print(f"→ 推送至: {url}")
 
-    async with httpx.AsyncClient(http2=True) as client:
-        resp = await client.post(url, headers=headers, content=payload_json)
+    if http_client is not None:
+        resp = await http_client.post(url, headers=headers, content=payload_json)
+    else:
+        async with httpx.AsyncClient(http2=True) as _client:
+            resp = await _client.post(url, headers=headers, content=payload_json)
 
     print(f"\n← Status: {resp.status_code}")
     if resp.text:
@@ -205,6 +209,8 @@ async def send_push(
 
     if resp.status_code == 200:
         print(f"\n✅ {action_label}推送成功！")
+        return True
     else:
         db_client.collection("notify").update(db_id, {"error":f"{resp.status_code}: {resp.text}"})
         print(f"\n❌ 推送失敗，請檢查 Token 和設定")
+        return False
