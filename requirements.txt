@@ -4,3 +4,4 @@ cryptography
 httpx[http2]
 dotenv
 requests
+firebase-admin

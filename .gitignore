@@ -2,3 +2,4 @@
 .env
 __*
 logs.txt
+fcm-account.json

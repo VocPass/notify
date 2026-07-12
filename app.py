@@ -1,4 +1,5 @@
 from update_live_activity import *
+from send_class_status_fcm import init_firebase, normalize_curriculum, send_batch
 from datetime import datetime, timezone, timedelta
 from pocketbase import PocketBase
 from dotenv import load_dotenv
@@ -99,6 +100,25 @@ def to_todaySlots(data):
                     }
                 )
     return schedules
+
+
+def to_android_slots(curriculum):
+    """把課表轉成 Android 端預期的扁平陣列（時間為 "HH:MM" 字串）。"""
+    slots = []
+    for name in curriculum:
+        for schedule in curriculum[name]["schedule"]:
+            if schedule["weekday"] == weekday:
+                tpl = time_template.get(schedule["period"], ("00:00", "00:00"))
+                slots.append(
+                    {
+                        "period": f"第{schedule['period']}節",
+                        "subject": name,
+                        "room": schedule.get("room", ""),
+                        "startTime": get_time_str(schedule, "start", tpl[0]),
+                        "endTime": get_time_str(schedule, "end", tpl[1]),
+                    }
+                )
+    return normalize_curriculum(slots)
 
 
 def get_action(curriculum):
@@ -223,11 +243,72 @@ for i in all_data:
         i.id, {"last_send": now.isoformat(), "last_action": label}
     )
 
+# ---------- Android ----------
+android_data = client.collection("notify_android").get_full_list()
+
+android_targets = []
+android_records = [] 
+for i in android_data:
+    if not i.is_open:
+        continue
+    curriculum = i.curriculum
+    if not curriculum:
+        continue
+    token = getattr(i, "fcm_token", "") or getattr(i, "device_token", "")
+    if not token:
+        continue
+    try:
+        result = get_action(curriculum)
+    except Exception as e:
+        print(f"Error processing curriculum for android id {i.id}: {e}")
+        continue
+    if result is None:
+        continue
+    action, label = result
+
+    # Android 不需要課前通知（notify_start），第一節前 20 分鐘直接發 update。
+    if action == "notify_start":
+        label = "課前更新"
+
+    # 同 label 今天已送過 → 跳過（每個狀態一天只送一次）
+    if i.last_send:
+        last_send_dt = datetime.fromisoformat(
+            i.last_send.replace("Z", "+00:00")
+        ).astimezone(tz_taiwan)
+        last_action = getattr(i, "last_action", None)
+        if last_action == label and last_send_dt.date() == now.date():
+            continue
+
+    try:
+        android_slots = to_android_slots(curriculum)
+    except Exception as e:
+        print(f"Error processing android slots for id {i.id}: {e}")
+        continue
+    if not android_slots:
+        continue
+
+    android_targets.append((token, android_slots))
+    android_records.append((i, label))
+
+if android_targets:
+    init_firebase()
+    results = send_batch(android_targets)
+    for (record, label), (ok, info) in zip(android_records, results):
+        if ok:
+            sended += 1
+            client.collection("notify_android").update(
+                record.id, {"last_send": now.isoformat(), "last_action": label}
+            )
+        else:
+            print(f"FCM send failed for android id {record.id}: {info}")
+
 t2 = time.time()
 
 if sended > 0:
     logs += f"{now.isoformat()}: {t2-t1:.2f}s -> {sended}\n"
     with open("logs.txt", "w+") as f:
         f.write(logs)
+
 # Ping
-r = requests.get(os.environ.get("status"))
+if os.environ.get("status"):
+    r = requests.get(os.environ.get("status"))
