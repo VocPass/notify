@@ -78,6 +78,12 @@ def build_payload(
                 "content-state": state,
                 "attributes-type": "ClassScheduleActivityAttributes",
                 "attributes": {},
+                # push-to-start 若不帶 alert，APNs 會回 200 但背景不會把 Live Activity
+                # 呈現出來（畫面不跳）。alert 是遠端啟動實際顯示的必要條件。
+                "alert": {
+                    "title": notify_title or "課表已開始",
+                    "body": notify_body or "今日課程動態島已啟動",
+                },
             }
         }
     elif action == "end":
@@ -145,13 +151,12 @@ async def send_push(
     notify_body: str = "",
     today_slots: list = [],
     jwt_token: str="",
+    is_dev: bool = False,
     db_client=None,
     db_id=None,
     http_client: httpx.AsyncClient = None,
 ):
     state = {**content_state, "todaySlots": today_slots}
-
-    host = APNS_HOST_SANDBOX if CONFIG["use_sandbox"] else APNS_HOST_PRODUCTION
 
     is_notify = action in ("notify_start", "notify_stop")
 
@@ -165,8 +170,6 @@ async def send_push(
     if not device_token:
         print("❌ 請先填入對應的 Token")
         return
-
-    url = f"https://{host}/3/device/{device_token}"
 
     token = jwt_token
     if is_notify:
@@ -195,22 +198,34 @@ async def send_push(
         "notify_stop": "通知結束",
     }[action]
     print(f"→ 操作: {action_label} Live Activity")
-    print(f"→ 推送至: {url}")
+
+    hosts = [APNS_HOST_PRODUCTION, APNS_HOST_SANDBOX]
+
+    async def _post(client, host):
+        url = f"https://{host}/3/device/{device_token}"
+        print(f"→ 推送至: {url}")
+        resp = await client.post(url, headers=headers, content=payload_json)
+        print(f"← Status: {resp.status_code}  Body: {resp.text}")
+        return resp
+
+    async def _run(client):
+        last = None
+        for host in hosts:
+            resp = await _post(client, host)
+            last = resp
+            if resp.status_code == 200:
+                print(f"✅ {action_label}推送成功！（{host}）")
+                return True
+            if not (resp.status_code == 400 and "BadDeviceToken" in resp.text):
+                break
+        if db_client is not None and db_id is not None:
+            db_client.collection("notify").update(
+                db_id, {"error": f"{last.status_code}: {last.text}"}
+            )
+        print("❌ 推送失敗，請檢查 Token 和設定")
+        return False
 
     if http_client is not None:
-        resp = await http_client.post(url, headers=headers, content=payload_json)
-    else:
-        async with httpx.AsyncClient(http2=True) as _client:
-            resp = await _client.post(url, headers=headers, content=payload_json)
-
-    print(f"\n← Status: {resp.status_code}")
-    if resp.text:
-        print(f"← Body: {resp.text}")
-
-    if resp.status_code == 200:
-        print(f"\n✅ {action_label}推送成功！")
-        return True
-    else:
-        db_client.collection("notify").update(db_id, {"error":f"{resp.status_code}: {resp.text}"})
-        print(f"\n❌ 推送失敗，請檢查 Token 和設定")
-        return False
+        return await _run(http_client)
+    async with httpx.AsyncClient(http2=True) as _client:
+        return await _run(_client)
