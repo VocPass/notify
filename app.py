@@ -266,6 +266,11 @@ if push_tasks:
             db_id, {"last_send": now.isoformat(), "last_action": label}
         )
 
+
+# Ping(不知道為什麼Google一直炸)
+if os.environ.get("status"):
+    r = requests.get(os.environ.get("status"))
+    
 # ---------- Android ----------
 android_data = client.collection("notify_android").get_full_list()
 
@@ -332,6 +337,4 @@ if sended > 0:
     with open("logs.txt", "w+") as f:
         f.write(logs)
 
-# Ping
-if os.environ.get("status"):
-    r = requests.get(os.environ.get("status"))
+
